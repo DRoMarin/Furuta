@@ -1,0 +1,13 @@
+while
+
+{
+	pos = pos_read;
+
+	err = end_pos - pos_read;
+	integ = integ + err;
+	deriv = err - prev_err;
+
+	prev_err = err;
+
+}
+
