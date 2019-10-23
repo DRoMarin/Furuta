@@ -1,0 +1,100 @@
+/* ========================================
+ *
+ * Copyright YOUR COMPANY, THE YEAR
+ * All Rights Reserved
+ * UNPUBLISHED, LICENSED SOFTWARE.
+ *
+ * CONFIDENTIAL AND PROPRIETARY INFORMATION
+ * WHICH IS THE PROPERTY OF your company.
+ *
+ * ========================================
+*/
+#include "project.h"
+#include "cyapicallbacks.h"
+#include "stdbool.h"
+#include "stdio.h"
+//#include "usbuartio.h"    
+int main(void)
+{
+    CyGlobalIntEnable; /* Enable global interrupts. */
+
+    /* Place your initialization/startup code here (e.g. MyInst_Start()) */
+
+   float ek = 0; //error
+    volatile float ik = 0; //accion integral y de memoria
+    volatile float dk = 0; //accion integral y de memoria
+    float KP = 1;
+    float KI = 1;
+    float KD = 1;
+    float acc = 0;
+    float mk = 0;   //accion de control
+    float posicion = 0;
+    float posicion1 = 0;
+    float pwm=100;
+
+    #define REFERENCE  0
+    #define MAXINTEGRAL    4.7 //antiwindup de 4.7V
+    #define PWM_FACTOR 100
+    #define PWM_MAX 255
+    float ikl = 0;
+    ADC_DelSig_1_Start();
+    ADC_DelSig_1_StartConvert();
+    PWM_1_Start();
+    LCD_Start();
+    LCD_ClearDisplay();
+    int valorADC;
+    float val;
+    char impr[10];
+    while (1) { //es un placeholder
+        	valorADC=ADC_DelSig_1_GetResult8();
+        posicion = (-45/128)*valorADC+387;
+        
+        if (valorADC>14) {
+    	    //data=data*-1;
+            Control_Reg_1_Write(0);
+        }else{
+             Control_Reg_1_Write(1);
+            }
+        
+    	/* Determina el error e inicia el cálculo del regulador PI _D */
+    	ek = REFERENCE - posicion;
+    	/* Porción integral, ikl es la integral atrasada un periodo */
+    	ik = KI * ek + ikl;
+    	/* Porción derivada, posicion1 es la salida atrasada un periodo */
+    	dk = KD * (posicion - posicion1);
+    	/* Acción total de control, el signo negativo es para realimentación negativa */
+    	acc = KP * ek + ik - dk;
+    	/* Escribe en el buffer mk del PWM que será actualizado sincrónicamente */
+    	mk = acc;
+        /*Escalar el pwm*/
+        pwm = (int16) (mk*PWM_FACTOR);
+        //pwm=127;
+        
+        if (pwm > PWM_MAX) { 
+                pwm = PWM_MAX;
+            }
+            else if (pwm < 0) {
+                pwm = 0; 
+            }
+        if ((posicion<170)&&(posicion>65)){
+            pwm=0;        
+        }
+        PWM_1_WriteCompare(pwm);
+        LCD_Position(0,0);
+        LCD_PrintNumber(pwm);
+        LCD_Position(1,0);
+        LCD_PrintNumber(posicion);
+        
+    	/* Guarda la salida para la siguiente vez */
+    	posicion1 = posicion;
+    	ikl = ik;
+    	/* Satura el término integral y lo guarda para la próxima vez */
+    	if (ik > MAXINTEGRAL)
+    		ikl = MAXINTEGRAL;
+    	else
+    		if (ik < -MAXINTEGRAL) ikl = -MAXINTEGRAL;
+        }
+        
+    }
+}
+/* [] END OF FILE */
